@@ -70,7 +70,8 @@ unique_layers = sorted(df["Layer"].dropna().unique().astype(int))
 total_layers = len(unique_layers)
 bbox = {ax: (df[ax].min(), df[ax].max()) for ax in ["X","Y","Z"]}
 
-# Sidebar: Controls & Summary\with st.sidebar.expander("📐 Controls & Summary", expanded=True):
+# Sidebar: Controls & Summary
+with st.sidebar.expander("📐 Controls & Summary", expanded=True):
     st.metric("Total Time Steps", total_steps)
     st.metric("Total Layers", total_layers)
     st.metric("Layer Markers Found", layer_markers)
@@ -82,10 +83,16 @@ bbox = {ax: (df[ax].min(), df[ax].max()) for ax in ["X","Y","Z"]}
     min_layer = unique_layers[0] if unique_layers else 0
     max_layer = unique_layers[-1] if unique_layers else 0
     layer_range = st.slider(
-        "Slice by Layer Range", min_value=min_layer, max_value=max_layer,
+        "Slice by Layer Range",
+        min_value=min_layer, max_value=max_layer,
         value=(min_layer, max_layer), step=1
     )
+
 # Filter data by layer range
+df_slice = df[(df["Layer"] >= layer_range[0]) & (df["Layer"] <= layer_range[1])]
+
+# Plot template for dark theme
+template = "plotly_dark"
 df_slice = df[(df["Layer"] >= layer_range[0]) & (df["Layer"] <= layer_range[1])]
 
 # Plot template for dark theme
