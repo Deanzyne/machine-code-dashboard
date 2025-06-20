@@ -13,6 +13,18 @@ st.markdown(
     """
     <style>
     html, body, [data-testid="stAppViewContainer"] { background-color: #0e1117 !important; color: #e0e0e0 !important; }
+    /* Remove top padding in sidebar */
+    [data-testid="stSidebar"] > div:first-child { margin-top: 0 !important; padding-top: 0 !important; }
+    [data-testid="stSidebar"] { background-color: #262730 !important; }
+    .stText, .css-1d391kg, .css-12oz5g7 { color: #e0e0e0 !important; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+st.markdown(
+    """
+    <style>
+    html, body, [data-testid="stAppViewContainer"] { background-color: #0e1117 !important; color: #e0e0e0 !important; }
     [data-testid="stSidebar"] { background-color: #262730 !important; }
     .stText, .css-1d391kg, .css-12oz5g7 { color: #e0e0e0 !important; }
     </style>
@@ -154,7 +166,7 @@ with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
         ),
         template=template, height=700, margin=dict(l=0, r=0, b=0, t=0)
     )
-    st.plotly_chart(fig3d, use_container_width=True)
+    st.plotly_chart(fig3d, use_container_width=False, width=1100)
 
 # XYZ Axes Over Time
 with st.expander("📈 XYZ Axes Over Time", expanded=True):
@@ -167,7 +179,7 @@ with st.expander("📈 XYZ Axes Over Time", expanded=True):
             avg = df_slice.groupby('Layer')[xyz_axes].mean().reset_index()
             fig_xyz = px.line(avg, x='Layer', y=xyz_axes, template=template)
         fig_xyz.update_layout(height=800)
-        st.plotly_chart(fig_xyz, use_container_width=True)
+        st.plotly_chart(fig_xyz, use_container_width=False, width=1100)
 
 # ABC Axes Over Time
 with st.expander("📈 ABC Axes Over Time", expanded=True):
@@ -180,7 +192,7 @@ with st.expander("📈 ABC Axes Over Time", expanded=True):
             avg = df_slice.groupby('Layer')[abc_axes].mean().reset_index()
             fig_abc = px.line(avg, x='Layer', y=abc_axes, template=template)
         fig_abc.update_layout(height=500)
-        st.plotly_chart(fig_abc, use_container_width=True)
+        st.plotly_chart(fig_abc, use_container_width=False, width=1100)
 
 # Data Table & Export
 with st.expander('📄 Data Table & Export', expanded=False):
