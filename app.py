@@ -8,24 +8,14 @@ import re
 # Page config
 st.set_page_config(page_title="G-code Analyzer Dashboard", layout="wide")
 
-# Dark theme CSS
+# Dark theme CSS (single block)
 st.markdown(
     """
     <style>
-    html, body, [data-testid="stAppViewContainer"] { background-color: #0e1117 !important; color: #e0e0e0 !important; }
+    html, body, [data-testid=\"stAppViewContainer\"] { background-color: #0e1117 !important; color: #e0e0e0 !important; }
     /* Remove top padding in sidebar */
-    [data-testid="stSidebar"] > div:first-child { margin-top: 0 !important; padding-top: 0 !important; }
-    [data-testid="stSidebar"] { background-color: #262730 !important; }
-    .stText, .css-1d391kg, .css-12oz5g7 { color: #e0e0e0 !important; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-st.markdown(
-    """
-    <style>
-    html, body, [data-testid="stAppViewContainer"] { background-color: #0e1117 !important; color: #e0e0e0 !important; }
-    [data-testid="stSidebar"] { background-color: #262730 !important; }
+    [data-testid=\"stSidebar\"] > div:first-child { margin-top: 0 !important; padding-top: 0 !important; }
+    [data-testid=\"stSidebar\"] { background-color: #262730 !important; }
     .stText, .css-1d391kg, .css-12oz5g7 { color: #e0e0e0 !important; }
     </style>
     """,
@@ -50,19 +40,18 @@ for line in lines:
     if ";-----------------------LAYER" in line:
         layer_markers += 1
         m = re.search(r"LAYER\s+(\d+)", line)
-        if m:
-            current_layer = int(m.group(1))
+        if m: current_layer = int(m.group(1))
     if "G1" in line:
         vals = {ax: None for ax in ['X','Y','Z','A','B','C','E']}
         for ax in vals:
             m = re.search(fr"{ax}([-+]?[0-9]*\.?[0-9]+)", line)
-            if m:
-                vals[ax] = float(m.group(1))
+            if m: vals[ax] = float(m.group(1))
         data['Time Step'].append(t)
         data['Layer'].append(current_layer)
         for ax in ['X','Y','Z','A','B','C','E']:
             data[ax].append(vals[ax])
         t += 1
+
 df = pd.DataFrame(data)
 
 # Summary statistics
@@ -97,40 +86,18 @@ for e in edges:
         x=[x0,x1], y=[y0,y1], z=[z0,z1],
         mode='lines', line=dict(color='lightgray', width=2), showlegend=False
     ))
-# Annotate X dimension on edges
-mid_x = (bx[0] + bx[1]) / 2
-fig_bb.add_trace(go.Scatter3d(
-    x=[mid_x], y=[by[0]], z=[bz[0]],
-    mode='text', text=[f"X: {lengths['X']:.2f} mm"], textposition='bottom center', showlegend=False
-))
-# Annotate Y dimension on edges
-mid_y = (by[0] + by[1]) / 2
-fig_bb.add_trace(go.Scatter3d(
-    x=[bx[0]], y=[mid_y], z=[bz[0]],
-    mode='text', text=[f"Y: {lengths['Y']:.2f} mm"], textposition='middle left', showlegend=False
-))
-# Annotate Z dimension on edges
-mid_z = (bz[0] + bz[1]) / 2
-fig_bb.add_trace(go.Scatter3d(
-    x=[bx[0]], y=[by[0]], z=[mid_z],
-    mode='text', text=[f"Z: {lengths['Z']:.2f} mm"], textposition='top center', showlegend=False
-))
-fig_bb.update_layout(
-    scene=dict(
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        zaxis=dict(visible=False),
-        aspectmode='data'
-    ),
-    template='plotly_dark', height=250, margin=dict(l=0, r=0, b=0, t=0)
-)
+# Annotate edges
+mid_x, mid_y, mid_z = (bx[0]+bx[1])/2, (by[0]+by[1])/2, (bz[0]+bz[1])/2
+fig_bb.add_trace(go.Scatter3d(x=[mid_x], y=[by[0]], z=[bz[0]], mode='text', text=[f"X: {lengths['X']:.2f} mm"], showlegend=False))
+fig_bb.add_trace(go.Scatter3d(x=[bx[0]], y=[mid_y], z=[bz[0]], mode='text', text=[f"Y: {lengths['Y']:.2f} mm"], showlegend=False))
+fig_bb.add_trace(go.Scatter3d(x=[bx[0]], y=[by[0]], z=[mid_z], mode='text', text=[f"Z: {lengths['Z']:.2f} mm"], showlegend=False))
+fig_bb.update_layout(scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode='data'), template='plotly_dark', height=250, margin=dict(l=0,r=0,b=0,t=0))
 st.sidebar.plotly_chart(fig_bb, use_container_width=True, config={"displayModeBar": False})
 
 # Layer range slider
 min_layer = unique_layers[0] if unique_layers else 0
 max_layer = unique_layers[-1] if unique_layers else 0
 layer_range = st.sidebar.slider("Select Layer Range:", min_layer, max_layer, (min_layer, max_layer), step=1)
-# Filtered data
 df_slice = df[(df['Layer'] >= layer_range[0]) & (df['Layer'] <= layer_range[1])]
 
 # Plot template
@@ -140,59 +107,41 @@ template = 'plotly_dark'
 with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
     mode3d = st.selectbox("Color by:", ['Layer','Time Step','Avg Layer Speed','Extrusion'])
     df3 = df_slice.dropna(subset=['X','Y','Z']).sort_values('Time Step')
-    if mode3d == 'Layer':
-        color = df3['Layer']
-    elif mode3d == 'Time Step':
-        color = df3['Time Step']
+    if mode3d == 'Layer': color = df3['Layer']
+    elif mode3d == 'Time Step': color = df3['Time Step']
     elif mode3d == 'Avg Layer Speed':
         coords = df3[['X','Y','Z']].to_numpy()
         d = np.linalg.norm(np.diff(coords, axis=0), axis=1)
-        speeds = np.concatenate([[0], d])
-        df3['speed'] = speeds
-        layer_speed = df3.groupby('Layer')['speed'].transform('mean')
-        color = layer_speed
-    else:  # Extrusion
-        color = df3['E'].diff().fillna(0)
-    fig3d = go.Figure(
-        go.Scatter3d(
-            x=df3['X'], y=df3['Y'], z=df3['Z'], mode='lines',
-            line=dict(color=color, colorscale='Viridis', width=6)
-        )
-    )
-    fig3d.update_layout(
-        scene=dict(
-            xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)',
-            aspectmode='data'
-        ),
-        template=template, height=700, margin=dict(l=0, r=0, b=0, t=0)
-    )
-    st.plotly_chart(fig3d, use_container_width=False, width=1100)
+        speeds = np.concatenate([[0], d]); df3['speed'] = speeds
+        color = df3.groupby('Layer')['speed'].transform('mean')
+    else: color = df3['E'].diff().fillna(0)
+    fig3d = go.Figure(go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'], mode='lines', line=dict(color=color, colorscale='Viridis', width=6)))
+    fig3d.update_layout(scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'), template=template, height=700, margin=dict(l=0,r=0,b=0,t=0))
+    st.plotly_chart(fig3d, use_container_width=False, width=1000)
 
 # XYZ Axes Over Time
 with st.expander("📈 XYZ Axes Over Time", expanded=True):
     mode_xyz = st.selectbox("XYZ Plot Mode:", ['Raw','Layer Average'], key='xyz_mode')
     xyz_axes = st.multiselect("Select XYZ axes:", ['X','Y','Z'], default=['X','Y','Z'])
     if xyz_axes:
-        if mode_xyz == 'Raw':
-            fig_xyz = px.line(df_slice.sort_values('Time Step'), x='Time Step', y=xyz_axes, template=template)
+        if mode_xyz == 'Raw': fig_xyz = px.line(df_slice.sort_values('Time Step'), x='Time Step', y=xyz_axes, template=template)
         else:
             avg = df_slice.groupby('Layer')[xyz_axes].mean().reset_index()
             fig_xyz = px.line(avg, x='Layer', y=xyz_axes, template=template)
         fig_xyz.update_layout(height=800)
-        st.plotly_chart(fig_xyz, use_container_width=False, width=1100)
+        st.plotly_chart(fig_xyz, use_container_width=False, width=1000)
 
 # ABC Axes Over Time
 with st.expander("📈 ABC Axes Over Time", expanded=True):
     mode_abc = st.selectbox("ABC Plot Mode:", ['Raw','Layer Average'], key='abc_mode')
     abc_axes = st.multiselect("Select ABC axes:", ['A','B','C'], default=['A','B','C'])
     if abc_axes:
-        if mode_abc == 'Raw':
-            fig_abc = px.line(df_slice.sort_values('Time Step'), x='Time Step', y=abc_axes, template=template)
+        if mode_abc == 'Raw': fig_abc = px.line(df_slice.sort_values('Time Step'), x='Time Step', y=abc_axes, template=template)
         else:
             avg = df_slice.groupby('Layer')[abc_axes].mean().reset_index()
             fig_abc = px.line(avg, x='Layer', y=abc_axes, template=template)
         fig_abc.update_layout(height=500)
-        st.plotly_chart(fig_abc, use_container_width=False, width=1100)
+        st.plotly_chart(fig_abc, use_container_width=False, width=1000)
 
 # Data Table & Export
 with st.expander('📄 Data Table & Export', expanded=False):
