@@ -117,7 +117,7 @@ with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
     else: color = df3['E'].diff().fillna(0)
     fig3d = go.Figure(go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'], mode='lines', line=dict(color=color, colorscale='Viridis', width=6)))
     fig3d.update_layout(scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'), template=template, height=700, margin=dict(l=0,r=0,b=0,t=0))
-    st.plotly_chart(fig3d, use_container_width=False, width=1000)
+    st.plotly_chart(fig3d, use_container_width=False, width=900)
 
 # XYZ Axes Over Time
 with st.expander("📈 XYZ Axes Over Time", expanded=True):
@@ -129,7 +129,7 @@ with st.expander("📈 XYZ Axes Over Time", expanded=True):
             avg = df_slice.groupby('Layer')[xyz_axes].mean().reset_index()
             fig_xyz = px.line(avg, x='Layer', y=xyz_axes, template=template)
         fig_xyz.update_layout(height=800)
-        st.plotly_chart(fig_xyz, use_container_width=False, width=1000)
+        st.plotly_chart(fig_xyz, use_container_width=False, width=900)
 
 # ABC Axes Over Time
 with st.expander("📈 ABC Axes Over Time", expanded=True):
@@ -141,7 +141,7 @@ with st.expander("📈 ABC Axes Over Time", expanded=True):
             avg = df_slice.groupby('Layer')[abc_axes].mean().reset_index()
             fig_abc = px.line(avg, x='Layer', y=abc_axes, template=template)
         fig_abc.update_layout(height=500)
-        st.plotly_chart(fig_abc, use_container_width=False, width=1000)
+        st.plotly_chart(fig_abc, use_container_width=False, width=900)
 
 # Data Table & Export
 with st.expander('📄 Data Table & Export', expanded=False):
