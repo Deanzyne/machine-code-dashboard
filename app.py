@@ -21,9 +21,9 @@ else:
     text_color = "#000000"
 st.markdown(f"""
 <style>
-html, body, [data-testid="stAppViewContainer"] {{background-color: {bg_color} !important; color: {text_color} !important;}}
-[data-testid="stSidebar"] {{background-color: {sidebar_color} !important;}}
-.stText, .css-1d391kg, .css-12oz5g7 {{color: {text_color} !important;}}
+html, body, [data-testid="stAppViewContainer"] {{ background-color: {bg_color} !important; color: {text_color} !important; }}
+[data-testid="stSidebar"] {{ background-color: {sidebar_color} !important; }}
+.stText, .css-1d391kg, .css-12oz5g7 {{ color: {text_color} !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -39,10 +39,12 @@ if not uploaded_file:
 # Read and parse data
 content = uploaded_file.read().decode("utf-8")
 lines = content.splitlines()
+# Initialize data dict
 data = {col: [] for col in ["Time Step","X","Y","Z","A","B","C","E","Layer"]}
 t = 0
 layer_markers = 0
 current_layer = -1
+# Parse lines
 for line in lines:
     if ";-----------------------LAYER" in line:
         layer_markers += 1
@@ -60,6 +62,7 @@ for line in lines:
         for ax in vals:
             data[ax].append(vals[ax])
         t += 1
+# Create DataFrame
 df = pd.DataFrame(data)
 
 # Compute summary
@@ -68,7 +71,7 @@ unique_layers = sorted(df["Layer"].dropna().unique().astype(int))
 total_layers = len(unique_layers)
 bbox = {ax: (df[ax].min(), df[ax].max()) for ax in ["X","Y","Z"]}
 
-# Sidebar: metrics
+# Sidebar metrics
 st.sidebar.metric("Total Time Steps", total_steps)
 st.sidebar.metric("Total Layers", total_layers)
 st.sidebar.metric("Layer Markers Found", layer_markers)
@@ -77,18 +80,25 @@ for ax in ["X","Y","Z"]:
     mi, ma = bbox[ax]
     st.sidebar.write(f"- {ax}: {ma-mi:.2f} (min {mi:.2f}, max {ma:.2f})")
 
-# Sidebar: layer slice slider (global)
+# Sidebar layer slice slider (global)
 min_layer = unique_layers[0] if unique_layers else 0
 max_layer = unique_layers[-1] if unique_layers else 0
-layer_slice = st.sidebar.slider("Slice by Layer #", min_value=min_layer, max_value=max_layer, value=max_layer, step=1)
+layer_slice = st.sidebar.slider(
+    "Slice by Layer #",
+    min_value=min_layer, max_value=max_layer,
+    value=max_layer, step=1
+)
+# Filtered DataFrame
 df_slice = df[df["Layer"] <= layer_slice]
 
-# Plot templates based on theme
+# Plotting template
 template = "plotly_dark" if theme == "Dark" else "plotly_white"
 
 # Main: XYZ Overlay
 st.subheader("📈 XYZ Axes Over Time")
-xyz_axes = st.multiselect("Select XYZ axes to overlay:", ["X","Y","Z"], default=["X","Y","Z"])
+xyz_axes = st.multiselect(
+    "Select XYZ axes to overlay:", ["X","Y","Z"], default=["X","Y","Z"]
+)
 if xyz_axes:
     fig_xyz = px.line(
         df_slice.sort_values("Time Step"), x="Time Step", y=xyz_axes,
@@ -104,7 +114,9 @@ col1, col2 = st.columns([1,1])
 # ABC Overlay
 with col1:
     st.subheader("📈 ABC Axes Over Time")
-    abc_axes = st.multiselect("Select ABC axes to overlay:", ["A","B","C"], default=["A","B","C"])
+    abc_axes = st.multiselect(
+        "Select ABC axes to overlay:", ["A","B","C"], default=["A","B","C"]
+    )
     if abc_axes:
         fig_abc = px.line(
             df_slice.sort_values("Time Step"), x="Time Step", y=abc_axes,
@@ -125,8 +137,12 @@ with col2:
         )
     )
     fig3d.update_layout(
-        scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'),
-        template=template, height=400, margin=dict(l=0,r=0,b=0,t=30)
+        scene=dict(
+            xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)',
+            aspectmode='data'
+        ),
+        template=template, height=400,
+        margin=dict(l=0, r=0, b=0, t=30)
     )
     st.plotly_chart(fig3d, use_container_width=True)
 
@@ -136,5 +152,3 @@ with st.expander("📄 Data Table & Export", expanded=False):
     st.dataframe(df_slice, use_container_width=True)
     csv = df_slice.to_csv(index=False).encode('utf-8')
     st.download_button("Download CSV", csv, "motion_data.csv", "text/csv")
-else:
-    st.info("Upload a .gcode or .mpf file to begin analysis.")
