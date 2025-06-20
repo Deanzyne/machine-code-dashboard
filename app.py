@@ -31,7 +31,6 @@ if uploaded_file:
             if m:
                 current_layer = int(m.group(1))
         elif "G1" in line:
-            # Extract all axes
             vals = {}
             for ax in ["X","Y","Z","A","B","C","E"]:
                 m = re.search(fr"{ax}([-+]?[0-9]*\.?[0-9]+)", line)
@@ -43,77 +42,81 @@ if uploaded_file:
             t += 1
     df = pd.DataFrame(data)
 
-    # Sidebar metrics
-    st.sidebar.header("📐 Summary")
+    # Sidebar controls & metrics
+    st.sidebar.header("📐 Summary & Controls")
     total_layers = df["Layer"].nunique(dropna=True)
-    bbox = {
-        ax: (df[ax].min(), df[ax].max())
-        for ax in ["X","Y","Z"]
-    }
+    bbox = {ax: (df[ax].min(), df[ax].max()) for ax in ["X","Y","Z"]}
     st.sidebar.metric("Total Time Steps", len(df))
     st.sidebar.metric("Total Layers", total_layers)
-    st.sidebar.write("**Bounding Box Dimensions (mm)**")
+    st.sidebar.write("**Bounding Box (mm)**")
     for ax in ["X","Y","Z"]:
         mi, ma = bbox[ax]
-        st.sidebar.write(f"- {ax}: {ma - mi:.2f}  (min {mi:.2f}, max {ma:.2f})")
+        st.sidebar.write(f"{ax}: {ma-mi:.2f} (min {mi:.2f}, max {ma:.2f})")
 
-    # Filter layers
+    # Theme switch
+    theme = st.sidebar.radio("Theme:", ["Light","Dark"], index=0)
+    template = "plotly_white" if theme == "Light" else "plotly_dark"
+
+    # Layer filter
     layers = sorted(df["Layer"].dropna().unique().astype(int))
     selected = st.sidebar.multiselect(
-        "Select Layers to include", options=layers, default=layers[:5]
+        "Select Layers:", options=layers, default=layers
     )
     filtered = df[df["Layer"].isin(selected)] if selected else df
 
-    # Main layout
     st.markdown("---")
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("📈 XYZ Axis Over Time")
-        xyz = st.multiselect("Choose axes to plot:", ["X","Y","Z"], default=["X","Y","Z"])
+        st.subheader("📈 XYZ Axes Over Time")
+        xyz = st.multiselect("Axes to plot:", ["X","Y","Z"], default=["X","Y","Z"])
         if xyz:
+            df_xyz = filtered.sort_values("Time Step")
             fig_xyz = px.line(
-                filtered,
+                df_xyz,
                 x="Time Step", y=xyz,
                 title="Overlay: XYZ Axes",
                 labels={"value":"Position (mm)", "variable":"Axis"},
+                template=template
             )
             st.plotly_chart(fig_xyz, use_container_width=True)
 
     with col2:
-        st.subheader("📈 ABC Axis Over Time")
-        abc = st.multiselect("Choose axes to plot:", ["A","B","C"], default=["A","B","C"])
+        st.subheader("📈 ABC Axes Over Time")
+        abc = st.multiselect("Axes to plot:", ["A","B","C"], default=["A","B","C"])
         if abc:
+            df_abc = filtered.sort_values("Time Step")
             fig_abc = px.line(
-                filtered,
+                df_abc,
                 x="Time Step", y=abc,
                 title="Overlay: ABC Axes",
                 labels={"value":"Angle (°)", "variable":"Axis"},
+                template=template
             )
             st.plotly_chart(fig_abc, use_container_width=True)
 
     st.markdown("---")
     st.subheader("🌐 3D Toolpath Visualizer")
+    df3 = filtered.dropna(subset=["X","Y","Z"]).sort_values("Time Step")
     fig3d = go.Figure(
         data=go.Scatter3d(
-            x=filtered['X'], y=filtered['Y'], z=filtered['Z'],
+            x=df3['X'], y=df3['Y'], z=df3['Z'],
             mode='lines',
-            line=dict(color=filtered['Layer'], colorscale='Viridis', width=2),
+            line=dict(color=df3['Layer'], colorscale='Viridis', width=4)
         )
     )
     fig3d.update_layout(
         scene=dict(
-            xaxis_title='X (mm)',
-            yaxis_title='Y (mm)',
-            zaxis_title='Z (mm)',
+            xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)',
             aspectmode='data'
         ),
+        template=template,
         margin=dict(l=0, r=0, b=0, t=30)
     )
     st.plotly_chart(fig3d, use_container_width=True)
 
     st.markdown("---")
-    st.subheader("📄 Data Table")
+    st.subheader("📄 Data Table & Export")
     st.dataframe(filtered, use_container_width=True)
     csv = filtered.to_csv(index=False).encode('utf-8')
     st.download_button("Download CSV", csv, "motion_data.csv", "text/csv")
