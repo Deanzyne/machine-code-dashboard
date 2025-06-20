@@ -78,7 +78,7 @@ for e in edges:
     x0,y0,z0 = corners[e[0]]
     x1,y1,z1 = corners[e[1]]
     fig_bb.add_trace(go.Scatter3d(x=[x0,x1], y=[y0,y1], z=[z0,z1], mode='lines', line=dict(color='white', width=2)))
-fig_bb.update_layout(title='Bounding Box', scene=dict(aspectmode='data'), template='plotly_dark', height=300, margin=dict(l=0,r=0,b=0,t30))
+fig_bb.update_layout(title='Bounding Box', scene=dict(aspectmode='data'), template='plotly_dark', height=300, margin=dict(l=0, r=0, b=0, t=30))
 st.sidebar.plotly_chart(fig_bb, use_container_width=True)
 
 # Layer slice
