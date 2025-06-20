@@ -126,42 +126,32 @@ template = 'plotly_dark'
 
 # 3D Toolpath Visualizer (full width)
 with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
-    mode3d = st.selectbox("Color by:", ['Layer','Time Step','Avg Layer Speed','Extrusion','Flat'])
+    mode3d = st.selectbox("Color by:", ['Layer','Time Step','Avg Layer Speed','Extrusion'])
     df3 = df_slice.dropna(subset=['X','Y','Z']).sort_values('Time Step')
-    # Determine color or flat mode rendering
-    if mode3d == 'Flat':
-        # Solid blue with increased thickness and markers for depth
-        fig3d = go.Figure(
-            go.Scatter3d(
-                x=df3['X'], y=df3['Y'], z=df3['Z'],
-                mode='lines+markers',
-                line=dict(color='blue', width=8),
-                marker=dict(color='blue', size=2)
-            )
+    if mode3d == 'Layer':
+        color = df3['Layer']
+    elif mode3d == 'Time Step':
+        color = df3['Time Step']
+    elif mode3d == 'Avg Layer Speed':
+        coords = df3[['X','Y','Z']].to_numpy()
+        d = np.linalg.norm(np.diff(coords, axis=0), axis=1)
+        speeds = np.concatenate([[0], d])
+        df3['speed'] = speeds
+        layer_speed = df3.groupby('Layer')['speed'].transform('mean')
+        color = layer_speed
+    else:  # Extrusion
+        color = df3['E'].diff().fillna(0)
+    fig3d = go.Figure(
+        go.Scatter3d(
+            x=df3['X'], y=df3['Y'], z=df3['Z'], mode='lines',
+            line=dict(color=color, colorscale='Viridis', width=6)
         )
-    else:
-        if mode3d == 'Layer':
-            color = df3['Layer']
-        elif mode3d == 'Time Step':
-            color = df3['Time Step']
-        elif mode3d == 'Avg Layer Speed':
-            coords = df3[['X','Y','Z']].to_numpy()
-            d = np.linalg.norm(np.diff(coords, axis=0), axis=1)
-            speeds = np.concatenate([[0], d])
-            df3['speed'] = speeds
-            layer_speed = df3.groupby('Layer')['speed'].transform('mean')
-            color = layer_speed
-        else:  # Extrusion
-            color = df3['E'].diff().fillna(0)
-        fig3d = go.Figure(
-            go.Scatter3d(
-                x=df3['X'], y=df3['Y'], z=df3['Z'],
-                mode='lines',
-                line=dict(color=color, colorscale='Viridis', width=6)
-            )
-        )
+    )
     fig3d.update_layout(
-        scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'),
+        scene=dict(
+            xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)',
+            aspectmode='data'
+        ),
         template=template, height=700, margin=dict(l=0, r=0, b=0, t=0)
     )
     st.plotly_chart(fig3d, use_container_width=True)
