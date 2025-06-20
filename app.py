@@ -138,7 +138,7 @@ with col2:
         extr=df3['E'].diff().fillna(0)
         color=extr
     fig3d=go.Figure(go.Scatter3d(x=df3['X'],y=df3['Y'],z=df3['Z'],mode='lines',line=dict(color=color,colorscale='Viridis',width=4)))
-    fig3d.update_layout(scene=dict(xaxis_title='X',yaxis_title='Y',zaxis_title='Z',aspectmode='data'),template=template,height=600,margin=dict(l=0,r=0,b=0,t30))
+    fig3d.update_layout(scene=dict(xaxis_title='X',yaxis_title='Y',zaxis_title='Z',aspectmode='data'),template=template,height=600,margin=dict(l=0, r=0, b=0, t=30))
     st.plotly_chart(fig3d,use_container_width=True)
 
 st.markdown('---')
