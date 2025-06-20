@@ -24,7 +24,7 @@ if uploaded_file:
             layer_match = re.search(r"LAYER\s+(\d+)", line)
             if layer_match:
                 current_layer = int(layer_match.group(1))
-        elif line.startswith("G1") and any(axis in line for axis in ["X", "Y", "Z", "A", "B", "C", "E"]):
+        elif "G1" in line and any(axis in line for axis in ["X", "Y", "Z", "A", "B", "C", "E"]):
             x = y = z = a = b = c = e = None
             if (m := re.search(r"X([-+]?[0-9]*\.?[0-9]+)", line)): x = float(m.group(1))
             if (m := re.search(r"Y([-+]?[0-9]*\.?[0-9]+)", line)): y = float(m.group(1))
