@@ -164,7 +164,7 @@ with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
         scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'),
         template=template, height=700, margin=dict(l=0, r=0, b=0, t=0)
     )
-    st.plotly_chart(fig3d, use_container_width=True)(fig3d, use_container_width=True)
+    st.plotly_chart(fig3d, use_container_width=True)
 
 # XYZ Axes Over Time
 with st.expander("📈 XYZ Axes Over Time", expanded=True):
