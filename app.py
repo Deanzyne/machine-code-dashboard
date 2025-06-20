@@ -85,11 +85,23 @@ for e in edges:
         x=[x0,x1], y=[y0,y1], z=[z0,z1],
         mode='lines', line=dict(color='lightgray', width=2), showlegend=False
     ))
-# Annotate X dimension on one edge
+# Annotate X dimension on edges
 mid_x = (bx[0] + bx[1]) / 2
 fig_bb.add_trace(go.Scatter3d(
     x=[mid_x], y=[by[0]], z=[bz[0]],
     mode='text', text=[f"X: {lengths['X']:.2f} mm"], textposition='bottom center', showlegend=False
+))
+# Annotate Y dimension on edges
+mid_y = (by[0] + by[1]) / 2
+fig_bb.add_trace(go.Scatter3d(
+    x=[bx[0]], y=[mid_y], z=[bz[0]],
+    mode='text', text=[f"Y: {lengths['Y']:.2f} mm"], textposition='middle left', showlegend=False
+))
+# Annotate Z dimension on edges
+mid_z = (bz[0] + bz[1]) / 2
+fig_bb.add_trace(go.Scatter3d(
+    x=[bx[0]], y=[by[0]], z=[mid_z],
+    mode='text', text=[f"Z: {lengths['Z']:.2f} mm"], textposition='top center', showlegend=False
 ))
 fig_bb.update_layout(
     scene=dict(
@@ -100,7 +112,7 @@ fig_bb.update_layout(
     ),
     template='plotly_dark', height=250, margin=dict(l=0, r=0, b=0, t=0)
 )
-st.sidebar.plotly_chart(fig_bb, use_container_width=True)
+st.sidebar.plotly_chart(fig_bb, use_container_width=True, config={"displayModeBar": False})
 
 # Layer range slider
 min_layer = unique_layers[0] if unique_layers else 0
