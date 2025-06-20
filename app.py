@@ -105,7 +105,7 @@ template = 'plotly_dark'
 
 # 3D Toolpath Visualizer (full width)
 with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
-    mode3d = st.selectbox("Color by:", ['Layer','Time Step','Avg Layer Speed','Extrusion'])
+    mode3d = st.selectbox("Color by:", ['Layer','Time Step','Avg Layer Speed','Extrusion','Height','Change in Height'])
     df3 = df_slice.dropna(subset=['X','Y','Z']).sort_values('Time Step')
     if mode3d == 'Layer': color = df3['Layer']
     elif mode3d == 'Time Step': color = df3['Time Step']
@@ -114,6 +114,10 @@ with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
         d = np.linalg.norm(np.diff(coords, axis=0), axis=1)
         speeds = np.concatenate([[0], d]); df3['speed'] = speeds
         color = df3.groupby('Layer')['speed'].transform('mean')
+    elif mode3d == 'Height':
+        color = df3['Z']
+    elif mode3d == 'Change in Height':
+        color = df3['Z'].diff().fillna(0)
     else: color = df3['E'].diff().fillna(0)
     fig3d = go.Figure(go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'], mode='lines', line=dict(color=color, colorscale='Viridis', width=6)))
     fig3d.update_layout(scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'), template=template, height=700, margin=dict(l=0,r=0,b=0,t=0))
