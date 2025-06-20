@@ -7,13 +7,20 @@ import re
 # Page configuration
 st.set_page_config(page_title="G-code Analyzer Dashboard", layout="wide")
 
-# Dark theme CSS (fixed)
+# Apply dark theme CSS
 st.markdown(
     """
     <style>
-    html, body, [data-testid="stAppViewContainer"] {background-color: #0e1117 !important; color: #e0e0e0 !important;}
-    [data-testid="stSidebar"] {background-color: #262730 !important;}
-    .stText, .css-1d391kg, .css-12oz5g7 {color: #e0e0e0 !important;}
+    html, body, [data-testid="stAppViewContainer"] {
+        background-color: #0e1117 !important;
+        color: #e0e0e0 !important;
+    }
+    [data-testid="stSidebar"] {
+        background-color: #262730 !important;
+    }
+    .stText, .css-1d391kg, .css-12oz5g7 {
+        color: #e0e0e0 !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -23,7 +30,9 @@ st.markdown(
 st.markdown("# 🧠 G-code / MPF Analyzer Dashboard")
 
 # File uploader
-uploaded_file = st.file_uploader("Upload a .gcode or .mpf file", type=["gcode","mpf","txt"])
+uploaded_file = st.file_uploader(
+    "Upload a .gcode or .mpf file", type=["gcode","mpf","txt"]
+)
 if not uploaded_file:
     st.info("Please upload a .gcode or .mpf file to begin analysis.")
     st.stop()
@@ -52,9 +61,10 @@ for line in lines:
         for ax in vals:
             data[ax].append(vals[ax])
         t += 1
+# Create DataFrame
 df = pd.DataFrame(data)
 
-# Compute summary
+# Compute summary statistics
 total_steps = len(df)
 unique_layers = sorted(df["Layer"].dropna().unique().astype(int))
 total_layers = len(unique_layers)
@@ -78,12 +88,14 @@ bbox = {ax: (df[ax].min(), df[ax].max()) for ax in ["X","Y","Z"]}
 # Filter data by layer range
 df_slice = df[(df["Layer"] >= layer_range[0]) & (df["Layer"] <= layer_range[1])]
 
-# Plot template
+# Plot template for dark theme
 template = "plotly_dark"
 
-# XYZ Overlay
+# Main: XYZ Overlay plot
 st.subheader("📈 XYZ Axes Over Time")
-xyz_axes = st.multiselect("Select XYZ axes to overlay:", ["X","Y","Z"], default=["X","Y","Z"])
+xyz_axes = st.multiselect(
+    "Select XYZ axes to overlay:", ["X","Y","Z"], default=["X","Y","Z"]
+)
 if xyz_axes:
     fig_xyz = px.line(
         df_slice.sort_values("Time Step"), x="Time Step", y=xyz_axes,
@@ -96,10 +108,12 @@ if xyz_axes:
 st.markdown("---")
 col1, col2 = st.columns([1,1])
 
-# ABC Overlay
+# ABC Overlay plot
 with col1:
     st.subheader("📈 ABC Axes Over Time")
-    abc_axes = st.multiselect("Select ABC axes to overlay:", ["A","B","C"], default=["A","B","C"])
+    abc_axes = st.multiselect(
+        "Select ABC axes to overlay:", ["A","B","C"], default=["A","B","C"]
+    )
     if abc_axes:
         fig_abc = px.line(
             df_slice.sort_values("Time Step"), x="Time Step", y=abc_axes,
@@ -109,7 +123,7 @@ with col1:
         fig_abc.update_layout(height=400)
         st.plotly_chart(fig_abc, use_container_width=True)
 
-# 3D Visualizer
+# 3D Toolpath visualizer plot
 with col2:
     st.subheader("🌐 3D Toolpath Visualizer by Layer")
     df3 = df_slice.dropna(subset=["X","Y","Z"]).sort_values("Time Step")
@@ -120,8 +134,12 @@ with col2:
         )
     )
     fig3d.update_layout(
-        scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'),
-        template=template, height=400, margin=dict(l=0, r=0, b=0, t=30)
+        scene=dict(
+            xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)',
+            aspectmode='data'
+        ),
+        template=template, height=400,
+        margin=dict(l=0,r=0,b=0,t=30)
     )
     st.plotly_chart(fig3d, use_container_width=True)
 
