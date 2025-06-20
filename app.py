@@ -126,7 +126,7 @@ template = 'plotly_dark'
 
 # 3D Toolpath Visualizer (full width)
 with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
-    mode3d = st.selectbox("Color by:", ['Layer','Time Step','Avg Layer Speed','Extrusion'])
+    mode3d = st.selectbox("Color by:", ['Layer','Time Step','Avg Layer Speed','Extrusion','Flat'])
     df3 = df_slice.dropna(subset=['X','Y','Z']).sort_values('Time Step')
     if mode3d == 'Layer':
         color = df3['Layer']
@@ -138,8 +138,10 @@ with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
         speeds = np.concatenate([[0], d])
         layer_speed = df3.groupby('Layer')['speed'].transform(lambda x: x.mean()) if 'speed' in df3 else speeds
         color = layer_speed
-    else:
+    elif mode3d == 'Extrusion':
         color = df3['E'].diff().fillna(0)
+    else:  # Flat
+        color = 'blue'  
     fig3d = go.Figure(
         go.Scatter3d(
             x=df3['X'], y=df3['Y'], z=df3['Z'], mode='lines',
@@ -162,7 +164,7 @@ with st.expander("📈 XYZ Axes Over Time", expanded=True):
         else:
             avg = df_slice.groupby('Layer')[xyz_axes].mean().reset_index()
             fig_xyz = px.line(avg, x='Layer', y=xyz_axes, template=template)
-        fig_xyz.update_layout(height=500)
+        fig_xyz.update_layout(height=800)
         st.plotly_chart(fig_xyz, use_container_width=True)
 
 # ABC Axes Over Time
