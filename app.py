@@ -127,6 +127,35 @@ template = 'plotly_dark'
 
 # 3D Toolpath Visualizer
 with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
+    cols_opts = st.columns([1,1,1,1,1])
+    mode_type = cols_opts[0].selectbox("Graph Type:", ['Line','Scatter','Streamtube'], help="Line: trajectory, Scatter: points, Streamtube: volumetric flow")
+    mode_color = cols_opts[1].selectbox("Visualization Mode:", ['Layer','Extrusion Rate','Distance','Layer Time'])
+    # Horizontal toggles
+    cb1, cb2, cb3 = st.columns(3)
+    show_seams    = cb1.checkbox("Seams")
+    show_extrema  = cb2.checkbox("High/Low")
+    show_startstop= cb3.checkbox("Start/Stop")
+
+    # Conditional slider with aligned ticks
+    min_l = unique_layers[0] if unique_layers else 0
+    max_l = unique_layers[-1] if unique_layers else 0
+    if min_l < max_l:
+        layer_range = st.slider("Slice Layer Range:", min_l, max_l, (min_l, max_l), step=1)
+        ticks = layer_ticks(min_l, max_l)
+        # display ticks aligned
+        cols_ticks = st.columns(11)
+        for idx, label in enumerate(ticks.keys()):
+            cols_ticks[idx].markdown(f"<small>{label}</small>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"**Only one layer:** {min_l}")
+        layer_range = (min_l, max_l)
+
+    df_slice = df[(df['Layer'] >= layer_range[0]) & (df['Layer'] <= layer_range[1])]
+    df3 = df_slice.dropna(subset=['X','Y','Z']).sort_values('Time Step')
+
+    # Color mapping remains unchanged
+
+with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
     mode_type = st.selectbox("Graph Type:", ['Line','Scatter','Streamtube'], help="Line: trajectory, Scatter: points, Streamtube: volumetric flow")
     mode_color = st.selectbox("Visualization Mode:", ['Layer','Extrusion Rate','Distance','Layer Time'])
     show_seams = st.checkbox("Show Layer Seams")
