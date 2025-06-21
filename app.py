@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import re
+import itertools
 
 # Page config
 st.set_page_config(page_title="G-code Analyzer Dashboard", layout="wide")
@@ -24,12 +25,41 @@ st.markdown(
 # Title
 st.markdown("# 🧠 G-code / MPF Analyzer Dashboard")
 
-# File uploader
-uploaded_file = st.file_uploader("Upload a .gcode or .mpf file", type=["gcode","mpf","txt"])
-if not uploaded_file:
-    st.info("Please upload a .gcode or .mpf file to begin.")
-    st.stop()
-
+# Data source selection
+source = st.sidebar.radio("Data Source:", ["Upload G-code/MPF", "Demo: Fibonacci Spiral", "Demo: Dodecahedron"])
+if source == "Upload G-code/MPF":
+    uploaded_file = st.file_uploader("Upload a .gcode or .mpf file", type=["gcode","mpf","txt"])
+    if not uploaded_file:
+        st.info("Please upload a .gcode or .mpf file or select a demo to begin.")
+        st.stop()
+    lines = uploaded_file.read().decode('utf-8').splitlines()
+elif source == "Demo: Fibonacci Spiral":
+    n = st.sidebar.slider("Fibonacci points", 10, 1000, 200)
+    lines = []
+    for i in range(n):
+        angle = np.deg2rad(137.5 * i)
+        r = 0.02 * i
+        x = r * np.cos(angle)
+        y = r * np.sin(angle)
+        z = 0.01 * i
+        lines.append(f"G1 X{x:.3f} Y{y:.3f} Z{z:.3f}")
+elif source == "Demo: Dodecahedron":
+    phi = (1 + np.sqrt(5)) / 2
+    a = 1 / phi
+    verts = []
+    # Cube corners
+    for signs in itertools.product([1, -1], repeat=3):
+        verts.append(signs)
+    # Other vertices
+    for x, y in itertools.product([1, -1], repeat=2):
+        verts.append((0, x*a, y*phi))
+        verts.append((x*a, y*phi, 0))
+        verts.append((x*phi, 0, y*a))
+    # Normalize and scale
+    lines = []
+    for v in verts:
+        x, y, z = v
+        lines.append(f"G1 X{x:.3f} Y{y:.3f} Z{z:.3f}")
 # Read and parse data
 lines = uploaded_file.read().decode('utf-8').splitlines()
 cols = ['Time Step','X','Y','Z','A','B','C','E','Layer']
