@@ -167,15 +167,19 @@ with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
         trace = go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'],
                              mode='markers', marker=dict(color=color, colorscale='Viridis', size=4, opacity=0.6), showlegend=False)
     else:
-        # streamtube: use motion vectors as u/v/w
         coords = df3[['X','Y','Z']].to_numpy()
-        diffs = np.diff(coords, axis=0)
-        u = np.concatenate([diffs[:,0], [0]])
-        v = np.concatenate([diffs[:,1], [0]])
-        w = np.concatenate([diffs[:,2], [0]])
-        trace = go.Streamtube(x=df3['X'], y=df3['Y'], z=df3['Z'],
-                              u=u.tolist(), v=v.tolist(), w=w.tolist(),
-                              colorscale='Viridis', sizeref=0.5, showlegend=False)
+        if len(coords) > 1:
+            diffs = np.diff(coords, axis=0)
+            u = np.concatenate([diffs[:,0], [0]])
+            v = np.concatenate([diffs[:,1], [0]])
+            w = np.concatenate([diffs[:,2], [0]])
+        else:
+            u = v = w = [0] * len(coords)
+        trace = go.Streamtube(
+            x=df3['X'], y=df3['Y'], z=df3['Z'],
+            u=u, v=v, w=w,
+            starts=dict(x=[df3['X'].iloc[0]], y=[df3['Y'].iloc[0]], z=[df3['Z'].iloc[0]]),
+            colorscale='Viridis', sizeref=0.5, showlegend=False)
 
     fig3d = go.Figure(trace)
     # Seams
@@ -185,7 +189,7 @@ with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
             fig3d.add_trace(go.Scatter3d(x=[s.X,e.X], y=[s.Y,e.Y], z=[s.Z,e.Z],
                                          mode='lines', line=dict(color='white', width=2), showlegend=False))
     # Extremes
-    if show_extrema:
+    if show_extrema and not df3.empty:
         for _, grp in df3.groupby('Layer'):
             hi = grp.loc[grp['Z'].idxmax()]; lo = grp.loc[grp['Z'].idxmin()]
             fig3d.add_trace(go.Scatter3d(x=[hi.X], y=[hi.Y], z=[hi.Z], mode='markers', marker=dict(color='yellow', size=4), showlegend=False))
@@ -196,9 +200,30 @@ with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
         fig3d.add_trace(go.Scatter3d(x=[s.X], y=[s.Y], z=[s.Z], mode='markers', marker=dict(color='green', size=6), showlegend=False))
         fig3d.add_trace(go.Scatter3d(x=[e.X], y=[e.Y], z=[e.Z], mode='markers', marker=dict(color='red', size=6), showlegend=False))
 
-    fig3d.update_layout(scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'),
-                       template=template, height=700, margin=dict(l=0,r=0,b=0,t=0))
-    st.plotly_chart(fig3d, use_container_width=False, width=900)
+    # Animation control
+    if st.checkbox("Animate Slice 3D", key='anim_toggle'):
+        layers_sorted = sorted(df3['Layer'].unique())
+        frames = []
+        for l in layers_sorted:
+            dfl = df3[df3['Layer'] <= l]
+            frames.append(go.Frame(
+                data=[go.Scatter3d(x=dfl['X'], y=dfl['Y'], z=dfl['Z'], mode='lines', line=dict(color='blue', width=6), showlegend=False)],
+                name=str(l)
+            ))
+        fig_anim = go.Figure(
+            data=[go.Scatter3d(x=[df3['X'].iloc[0]], y=[df3['Y'].iloc[0]], z=[df3['Z'].iloc[0]], mode='lines', line=dict(color='blue', width=6), showlegend=False)],
+            layout=go.Layout(
+                updatemenus=[dict(type='buttons', showactive=False,
+                                  buttons=[dict(label='Play', method='animate',
+                                                args=[None, {'frame':{'duration': int(10000/len(frames))}, 'fromcurrent':True}])])]
+            ),
+            frames=frames
+        )
+        fig_anim.update_layout(scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'), template=template, height=700, margin=dict(l=0,r=0,b=0,t=0))
+        st.plotly_chart(fig_anim, use_container_width=False, width=900)
+    else:
+        fig3d.update_layout(scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'), template=template, height=700, margin=dict(l=0,r=0,b=0,t=0))
+        st.plotly_chart(fig3d, use_container_width=False, width=900)
 
 # XYZ Over Time
 with st.expander("📈 XYZ Axes Over Time", expanded=True):
