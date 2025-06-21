@@ -53,12 +53,9 @@ elif source == "Demo: Dodecahedron":
         verts.append((0, x*a, y*phi))
         verts.append((x*a, y*phi, 0))
         verts.append((x*phi, 0, y*a))
-    lines = []
-    for v in verts:
-        x, y, z = v
-        lines.append(f"G1 X{x:.3f} Y{y:.3f} Z{z:.3f}")
+    lines = [f"G1 X{v[0]:.3f} Y{v[1]:.3f} Z{v[2]:.3f}" for v in verts]
 
-# Parse toolpath lines
+# Parse lines
 cols = ['Time Step','X','Y','Z','A','B','C','E','Layer']
 data = {c: [] for c in cols}
 t, layer_markers, current_layer = 0, 0, -1
@@ -66,24 +63,20 @@ for line in lines:
     if ";-----------------------LAYER" in line:
         layer_markers += 1
         m = re.search(r"LAYER\s+(\d+)", line)
-        if m:
-            current_layer = int(m.group(1))
+        if m: current_layer = int(m.group(1))
     if "G1" in line:
         vals = {ax: None for ax in ['X','Y','Z','A','B','C','E']}
         for ax in vals:
             m = re.search(fr"{ax}([-+]?[0-9]*\.?[0-9]+)", line)
-            if m:
-                vals[ax] = float(m.group(1))
+            if m: vals[ax] = float(m.group(1))
         data['Time Step'].append(t)
         data['Layer'].append(current_layer)
         for ax in ['X','Y','Z','A','B','C','E']:
             data[ax].append(vals[ax])
         t += 1
-
-# Build DataFrame
 df = pd.DataFrame(data)
 
-# Summary stats
+# Summary
 total_steps = len(df)
 unique_layers = sorted(df['Layer'].dropna().unique().astype(int))
 total_layers = len(unique_layers)
@@ -94,7 +87,7 @@ volume_m3 = np.prod([lengths[ax]/1000 for ax in ['X','Y','Z']])
 def layer_ticks(min_l, max_l):
     return {f"{i*10}%": int(min_l + (max_l-min_l)*i/10) for i in range(11)}
 
-# Sidebar summary
+# Sidebar
 st.sidebar.header("📐 Summary & Bounding Box")
 st.sidebar.metric("Total Time Steps", total_steps)
 st.sidebar.metric("Total Layers", total_layers)
@@ -104,20 +97,20 @@ for ax in ['X','Y','Z']:
     st.sidebar.write(f"- {ax} length: {lengths[ax]:.2f} mm")
 st.sidebar.write(f"**Volume:** {volume_m3:.6f} m³")
 
-# Plot template
+# Template
 template = 'plotly_dark'
 
-# 3D Visualizer expander
+# 3D Visualizer
 with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
-    col1, col2 = st.columns(2)
-    graph_type = col1.selectbox("Graph Type:", ['Line','Scatter','Streamtube'], key='graph_type')
-    vis_mode = col2.selectbox("Visualization Mode:", ['Layer','Extrusion Rate','Distance','Layer Time'], key='vis_mode')
-    # Toggles in a row
-    show_seams = st.checkbox("Show Layer Seams", value=False, key='seams')
-    show_extrema = st.checkbox("Show Layer High/Low", value=False, key='extrema')
-    show_startstop = st.checkbox("Show Part Start/Stop", value=False, key='startstop')
+    c1, c2, c3, c4 = st.columns([3,3,1,1])
+    graph_type = c1.selectbox("Graph Type:", ['Line','Scatter','Streamtube'], key='graph_type')
+    vis_mode = c2.selectbox("Visualization Mode:", ['Layer','Extrusion Rate','Distance','Layer Time'], key='vis_mode')
+    show_seams = c3.checkbox("Show Layer Seams", value=False, key='seams')
+    show_extrema = c3.checkbox("Show Layer High/Low", value=False, key='extrema')
+    show_startstop = c3.checkbox("Show Part Start/Stop", value=False, key='startstop')
+    animate = c4.button("Animate 10s", key='animate')
 
-    # Layer slider below
+    # Layer slider
     min_l = unique_layers[0] if unique_layers else 0
     max_l = unique_layers[-1] if unique_layers else 0
     layer_range = st.slider("Slice Layer Range:", min_l, max_l, (min_l, max_l), step=1, key='slice_range')
@@ -141,43 +134,58 @@ with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
 
     # Build trace
     if graph_type=='Line':
-        trace = go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'], mode='lines',
-                             line=dict(color=color, colorscale='Viridis', width=6))
+        base_trace = go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'], mode='lines',
+                                  line=dict(color=color, colorscale='Viridis', width=6))
     elif graph_type=='Scatter':
-        trace = go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'], mode='markers',
-                              marker=dict(color=color, colorscale='Viridis', size=4, opacity=0.6))
+        base_trace = go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'], mode='markers',
+                                   marker=dict(color=color, colorscale='Viridis', size=4, opacity=0.6))
     else:
-        # Streamtube uses u,v,w components: approximate via differences
         coords = df3[['X','Y','Z']].to_numpy()
         u = np.concatenate([[0], np.diff(coords[:,0])])
         v = np.concatenate([[0], np.diff(coords[:,1])])
         w = np.concatenate([[0], np.diff(coords[:,2])])
-        trace = go.Streamtube(x=df3['X'], y=df3['Y'], z=df3['Z'], u=u, v=v, w=w,
-                               colorscale='Viridis', sizeref=0.5)
+        base_trace = go.Streamtube(x=df3['X'], y=df3['Y'], z=df3['Z'], u=u, v=v, w=w,
+                                    colorscale='Viridis', sizeref=0.5)
 
-    fig3d = go.Figure(trace)
-    # Seams
-    if show_seams:
-        for _, grp in df3.groupby('Layer'):
-            start, end = grp.iloc[0], grp.iloc[-1]
-            fig3d.add_trace(go.Scatter3d(x=[start.X,end.X], y=[start.Y,end.Y], z=[start.Z,end.Z],
-                                       mode='lines', line=dict(color='white', width=2), showlegend=False))
-    # Extrema
-    if show_extrema:
-        for _, grp in df3.groupby('Layer'):
-            hi = grp.loc[grp['Z'].idxmax()]
-            lo = grp.loc[grp['Z'].idxmin()]
-            fig3d.add_trace(go.Scatter3d(x=[hi.X], y=[hi.Y], z=[hi.Z],
-                                       mode='markers', marker=dict(color='yellow', size=4), showlegend=False))
-            fig3d.add_trace(go.Scatter3d(x=[lo.X], y=[lo.Y], z=[lo.Z],
-                                       mode='markers', marker=dict(color='orange', size=4), showlegend=False))
-    # Start/stop
-    if show_startstop and not df3.empty:
-        s, e = df3.iloc[0], df3.iloc[-1]
-        fig3d.add_trace(go.Scatter3d(x=[s.X], y=[s.Y], z=[s.Z],
-                                   mode='markers', marker=dict(color='green', size=6), showlegend=False))
-        fig3d.add_trace(go.Scatter3d(x=[e.X], y=[e.Y], z=[e.Z],
-                                   mode='markers', marker=dict(color='red', size=6), showlegend=False))
+    # Animation frames if requested
+    if animate:
+        frames = []
+        total = len(df3)
+        N = 50
+        for i, frac in enumerate(np.linspace(1/ N, 1, N)):
+            cutoff = int(frac * total)
+            partial = df3.iloc[:cutoff]
+            theta = 2 * np.pi * frac
+            eye = dict(x=2*np.cos(theta), y=2*np.sin(theta), z=1)
+            # use same trace type
+            if graph_type=='Line':
+                data = [go.Scatter3d(x=partial['X'], y=partial['Y'], z=partial['Z'], mode='lines', line=dict(color=color.iloc[:cutoff], colorscale='Viridis', width=6))]
+            elif graph_type=='Scatter':
+                data = [go.Scatter3d(x=partial['X'], y=partial['Y'], z=partial['Z'], mode='markers', marker=dict(color=color.iloc[:cutoff], colorscale='Viridis', size=4, opacity=0.6))]
+            else:
+                data = [go.Streamtube(x=partial['X'], y=partial['Y'], z=partial['Z'], u=u[:cutoff], v=v[:cutoff], w=w[:cutoff], colorscale='Viridis', sizeref=0.5)]
+            frames.append(go.Frame(data=data, name=f'frame{i}', layout=dict(scene_camera=dict(eye=eye))))
+        fig3d = go.Figure(data=[base_trace], frames=frames)
+        fig3d.update_layout(updatemenus=[dict(type='buttons', showactive=False, buttons=[dict(label='Play', method='animate', args=[None, dict(frame=dict(duration=200, redraw=True), transition=dict(duration=0), fromcurrent=True)])])])
+    else:
+        fig3d = go.Figure(data=[base_trace])
+
+    # Seams, extrema, startstop on base figure
+    if not animate:
+        if show_seams:
+            for _, grp in df3.groupby('Layer'):
+                start, end = grp.iloc[0], grp.iloc[-1]
+                fig3d.add_trace(go.Scatter3d(x=[start.X,end.X], y=[start.Y,end.Y], z=[start.Z,end.Z], mode='lines', line=dict(color='white', width=2), showlegend=False))
+        if show_extrema:
+            for _, grp in df3.groupby('Layer'):
+                hi = grp.loc[grp['Z'].idxmax()]
+                lo = grp.loc[grp['Z'].idxmin()]
+                fig3d.add_trace(go.Scatter3d(x=[hi.X], y=[hi.Y], z=[hi.Z], mode='markers', marker=dict(color='yellow', size=4), showlegend=False))
+                fig3d.add_trace(go.Scatter3d(x=[lo.X], y=[lo.Y], z=[lo.Z], mode='markers', marker=dict(color='orange', size=4), showlegend=False))
+        if show_startstop and not df3.empty:
+            s, e = df3.iloc[0], df3.iloc[-1]
+            fig3d.add_trace(go.Scatter3d(x=[s.X], y=[s.Y], z=[s.Z], mode='markers', marker=dict(color='green', size=6), showlegend=False))
+            fig3d.add_trace(go.Scatter3d(x=[e.X], y=[e.Y], z=[e.Z], mode='markers', marker=dict(color='red', size=6), showlegend=False))
 
     fig3d.update_layout(
         scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'),
