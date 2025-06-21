@@ -26,15 +26,15 @@ st.markdown(
 st.markdown("# 🧠 G-code / MPF Analyzer Dashboard")
 
 # Data source selection
-source = st.sidebar.radio("Data Source:", ["Upload G-code/MPF", "Demo: Fibonacci Spiral", "Demo: Dodecahedron"])
+source = st.sidebar.radio("Data Source:", ["Upload G-code/MPF", "Demo: Fibonacci Spiral", "Demo: Dodecahedron"], key='source')
 if source == "Upload G-code/MPF":
-    uploaded_file = st.file_uploader("Upload a .gcode or .mpf file", type=["gcode","mpf","txt"])
+    uploaded_file = st.file_uploader("Upload a .gcode or .mpf file", type=["gcode","mpf","txt"], key='file_uploader')
     if not uploaded_file:
         st.info("Please upload a .gcode or .mpf file or select a demo to begin.")
         st.stop()
     lines = uploaded_file.read().decode('utf-8').splitlines()
 elif source == "Demo: Fibonacci Spiral":
-    n = st.sidebar.slider("Fibonacci points", 10, 1000, 200)
+    n = st.sidebar.slider("Fibonacci points", 10, 1000, 200, key='fib_points')
     lines = []
     for i in range(n):
         angle = np.deg2rad(137.5 * i)
@@ -58,7 +58,7 @@ elif source == "Demo: Dodecahedron":
         x, y, z = v
         lines.append(f"G1 X{x:.3f} Y{y:.3f} Z{z:.3f}")
 
-# Parse toolpath lines into numeric data
+# Parse toolpath lines
 cols = ['Time Step','X','Y','Z','A','B','C','E','Layer']
 data = {c: [] for c in cols}
 t, layer_markers, current_layer = 0, 0, -1
@@ -66,20 +66,24 @@ for line in lines:
     if ";-----------------------LAYER" in line:
         layer_markers += 1
         m = re.search(r"LAYER\s+(\d+)", line)
-        if m: current_layer = int(m.group(1))
+        if m:
+            current_layer = int(m.group(1))
     if "G1" in line:
         vals = {ax: None for ax in ['X','Y','Z','A','B','C','E']}
         for ax in vals:
             m = re.search(fr"{ax}([-+]?[0-9]*\.?[0-9]+)", line)
-            if m: vals[ax] = float(m.group(1))
+            if m:
+                vals[ax] = float(m.group(1))
         data['Time Step'].append(t)
         data['Layer'].append(current_layer)
         for ax in ['X','Y','Z','A','B','C','E']:
             data[ax].append(vals[ax])
         t += 1
+
+# Build DataFrame
 df = pd.DataFrame(data)
 
-# Summary
+# Summary stats
 total_steps = len(df)
 unique_layers = sorted(df['Layer'].dropna().unique().astype(int))
 total_layers = len(unique_layers)
@@ -87,7 +91,10 @@ bbox = {ax: (df[ax].min(), df[ax].max()) for ax in ['X','Y','Z']}
 lengths = {ax: bbox[ax][1] - bbox[ax][0] for ax in ['X','Y','Z']}
 volume_m3 = np.prod([lengths[ax]/1000 for ax in ['X','Y','Z']])
 
-# Sidebar
+def layer_ticks(min_l, max_l):
+    return {f"{i*10}%": int(min_l + (max_l-min_l)*i/10) for i in range(11)}
+
+# Sidebar summary
 st.sidebar.header("📐 Summary & Bounding Box")
 st.sidebar.metric("Total Time Steps", total_steps)
 st.sidebar.metric("Total Layers", total_layers)
@@ -97,91 +104,35 @@ for ax in ['X','Y','Z']:
     st.sidebar.write(f"- {ax} length: {lengths[ax]:.2f} mm")
 st.sidebar.write(f"**Volume:** {volume_m3:.6f} m³")
 
-# 3D bounding box visualizer in sidebar
-bx, by, bz = bbox['X'], bbox['Y'], bbox['Z']
-corners = [[bx[i], by[j], bz[k]] for i in range(2) for j in range(2) for k in range(2)]
-edges = [(0,1),(0,2),(0,4),(1,3),(1,5),(2,3),(2,6),(3,7),(4,5),(4,6),(5,7),(6,7)]
-fig_bb = go.Figure()
-for e in edges:
-    x0,y0,z0 = corners[e[0]]
-    x1,y1,z1 = corners[e[1]]
-    fig_bb.add_trace(go.Scatter3d(
-        x=[x0,x1], y=[y0,y1], z=[z0,z1],
-        mode='lines', line=dict(color='lightgray', width=2), showlegend=False
-    ))
-mid_x = (bx[0] + bx[1]) / 2
-fig_bb.add_trace(go.Scatter3d(x=[mid_x], y=[by[0]], z=[bz[0]], mode='text', text=[f"X: {lengths['X']:.2f} mm"], showlegend=False))
-mid_y = (by[0] + by[1]) / 2
-fig_bb.add_trace(go.Scatter3d(x=[bx[0]], y=[mid_y], z=[bz[0]], mode='text', text=[f"Y: {lengths['Y']:.2f} mm"], showlegend=False))
-mid_z = (bz[0] + bz[1]) / 2
-fig_bb.add_trace(go.Scatter3d(x=[bx[0]], y=[by[0]], z=[mid_z], mode='text', text=[f"Z: {lengths['Z']:.2f} mm"], showlegend=False))
-fig_bb.update_layout(scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode='data'), template='plotly_dark', height=200, margin=dict(l=0, r=0, b=0, t=0))
-st.sidebar.plotly_chart(fig_bb, use_container_width=True, config={"displayModeBar": False})
-
-# Helper for slider ticks
-def layer_ticks(min_l, max_l):
-    return {f"{i*10}%": int(min_l + (max_l-min_l)*i/10) for i in range(11)}
-
 # Plot template
 template = 'plotly_dark'
 
-# 3D Toolpath Visualizer
+# 3D Visualizer expander
 with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
-    cols_opts = st.columns([1,1,1,1,1])
-    mode_type = cols_opts[0].selectbox("Graph Type:", ['Line','Scatter','Streamtube'], help="Line: trajectory, Scatter: points, Streamtube: volumetric flow")
-    mode_color = cols_opts[1].selectbox("Visualization Mode:", ['Layer','Extrusion Rate','Distance','Layer Time'])
-    # Horizontal toggles
-    cb1, cb2, cb3 = st.columns(3)
-    show_seams    = cb1.checkbox("Seams")
-    show_extrema  = cb2.checkbox("High/Low")
-    show_startstop= cb3.checkbox("Start/Stop")
+    col1, col2 = st.columns(2)
+    graph_type = col1.selectbox("Graph Type:", ['Line','Scatter','Streamtube'], key='graph_type')
+    vis_mode = col2.selectbox("Visualization Mode:", ['Layer','Extrusion Rate','Distance','Layer Time'], key='vis_mode')
+    # Toggles in a row
+    show_seams = st.checkbox("Show Layer Seams", value=False, key='seams')
+    show_extrema = st.checkbox("Show Layer High/Low", value=False, key='extrema')
+    show_startstop = st.checkbox("Show Part Start/Stop", value=False, key='startstop')
 
-    # Conditional slider with aligned ticks
+    # Layer slider below
     min_l = unique_layers[0] if unique_layers else 0
     max_l = unique_layers[-1] if unique_layers else 0
-    if min_l < max_l:
-        layer_range = st.slider("Slice Layer Range:", min_l, max_l, (min_l, max_l), step=1)
-        ticks = layer_ticks(min_l, max_l)
-        # display ticks aligned
-        cols_ticks = st.columns(11)
-        for idx, label in enumerate(ticks.keys()):
-            cols_ticks[idx].markdown(f"<small>{label}</small>", unsafe_allow_html=True)
-    else:
-        st.markdown(f"**Only one layer:** {min_l}")
-        layer_range = (min_l, max_l)
-
-    df_slice = df[(df['Layer'] >= layer_range[0]) & (df['Layer'] <= layer_range[1])]
-    df3 = df_slice.dropna(subset=['X','Y','Z']).sort_values('Time Step')
-
-    # Color mapping remains unchanged
-
-with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
-    mode_type = st.selectbox("Graph Type:", ['Line','Scatter','Streamtube'], help="Line: trajectory, Scatter: points, Streamtube: volumetric flow")
-    mode_color = st.selectbox("Visualization Mode:", ['Layer','Extrusion Rate','Distance','Layer Time'])
-    show_seams = st.checkbox("Show Layer Seams")
-    show_extrema = st.checkbox("Show Layer High/Low")
-    show_startstop = st.checkbox("Show Part Start/Stop")
-
-    # Conditional slider
-    min_l = unique_layers[0] if unique_layers else 0
-    max_l = unique_layers[-1] if unique_layers else 0
-    if min_l < max_l:
-        layer_range = st.slider("Slice Layer Range:", min_l, max_l, (min_l, max_l), step=1)
-        ticks = layer_ticks(min_l, max_l)
-        st.markdown(f"**Ticks:** {'  '.join(ticks.keys())}")
-    else:
-        st.markdown(f"**Only one layer:** {min_l}")
-        layer_range = (min_l, max_l)
+    layer_range = st.slider("Slice Layer Range:", min_l, max_l, (min_l, max_l), step=1, key='slice_range')
+    ticks = layer_ticks(min_l, max_l)
+    cols_ticks = st.columns(11)
+    for idx, (label, val) in enumerate(ticks.items()):
+        cols_ticks[idx].caption(f"{label}\n{val}")
 
     df_slice = df[(df['Layer'] >= layer_range[0]) & (df['Layer'] <= layer_range[1])]
     df3 = df_slice.dropna(subset=['X','Y','Z']).sort_values('Time Step')
 
     # Color mapping
-    if mode_color == 'Layer':
-        color = df3['Layer']
-    elif mode_color == 'Extrusion Rate':
-        color = df3['E'].diff().fillna(0)
-    elif mode_color == 'Distance':
+    if vis_mode=='Layer': color = df3['Layer']
+    elif vis_mode=='Extrusion Rate': color = df3['E'].diff().fillna(0)
+    elif vis_mode=='Distance':
         coords = df3[['X','Y','Z']].to_numpy()
         d = np.linalg.norm(np.diff(coords, axis=0), axis=1)
         color = pd.Series(np.concatenate([[0], d]), index=df3.index)
@@ -189,78 +140,58 @@ with st.expander("🌐 3D Toolpath Visualizer (Full Width)", expanded=True):
         color = df3.groupby('Layer')['Time Step'].transform('mean')
 
     # Build trace
-    if mode_type == 'Line':
-        trace = go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'],
-                             mode='lines', line=dict(color=color, colorscale='Viridis', width=6), showlegend=False)
-    elif mode_type == 'Scatter':
-        trace = go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'],
-                             mode='markers', marker=dict(color=color, colorscale='Viridis', size=4, opacity=0.6), showlegend=False)
+    if graph_type=='Line':
+        trace = go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'], mode='lines',
+                             line=dict(color=color, colorscale='Viridis', width=6))
+    elif graph_type=='Scatter':
+        trace = go.Scatter3d(x=df3['X'], y=df3['Y'], z=df3['Z'], mode='markers',
+                              marker=dict(color=color, colorscale='Viridis', size=4, opacity=0.6))
     else:
+        # Streamtube uses u,v,w components: approximate via differences
         coords = df3[['X','Y','Z']].to_numpy()
-        if len(coords) > 1:
-            diffs = np.diff(coords, axis=0)
-            u = np.concatenate([diffs[:,0], [0]])
-            v = np.concatenate([diffs[:,1], [0]])
-            w = np.concatenate([diffs[:,2], [0]])
-        else:
-            u = v = w = [0] * len(coords)
-        trace = go.Streamtube(
-            x=df3['X'], y=df3['Y'], z=df3['Z'],
-            u=u, v=v, w=w,
-            starts=dict(x=[df3['X'].iloc[0]], y=[df3['Y'].iloc[0]], z=[df3['Z'].iloc[0]]),
-            colorscale='Viridis', sizeref=0.5, showlegend=False)
+        u = np.concatenate([[0], np.diff(coords[:,0])])
+        v = np.concatenate([[0], np.diff(coords[:,1])])
+        w = np.concatenate([[0], np.diff(coords[:,2])])
+        trace = go.Streamtube(x=df3['X'], y=df3['Y'], z=df3['Z'], u=u, v=v, w=w,
+                               colorscale='Viridis', sizeref=0.5)
 
     fig3d = go.Figure(trace)
     # Seams
     if show_seams:
         for _, grp in df3.groupby('Layer'):
-            s, e = grp.iloc[0], grp.iloc[-1]
-            fig3d.add_trace(go.Scatter3d(x=[s.X,e.X], y=[s.Y,e.Y], z=[s.Z,e.Z],
-                                         mode='lines', line=dict(color='white', width=2), showlegend=False))
-    # Extremes
-    if show_extrema and not df3.empty:
+            start, end = grp.iloc[0], grp.iloc[-1]
+            fig3d.add_trace(go.Scatter3d(x=[start.X,end.X], y=[start.Y,end.Y], z=[start.Z,end.Z],
+                                       mode='lines', line=dict(color='white', width=2), showlegend=False))
+    # Extrema
+    if show_extrema:
         for _, grp in df3.groupby('Layer'):
-            hi = grp.loc[grp['Z'].idxmax()]; lo = grp.loc[grp['Z'].idxmin()]
-            fig3d.add_trace(go.Scatter3d(x=[hi.X], y=[hi.Y], z=[hi.Z], mode='markers', marker=dict(color='yellow', size=4), showlegend=False))
-            fig3d.add_trace(go.Scatter3d(x=[lo.X], y=[lo.Y], z=[lo.Z], mode='markers', marker=dict(color='orange', size=4), showlegend=False))
-    # Start/Stop
+            hi = grp.loc[grp['Z'].idxmax()]
+            lo = grp.loc[grp['Z'].idxmin()]
+            fig3d.add_trace(go.Scatter3d(x=[hi.X], y=[hi.Y], z=[hi.Z],
+                                       mode='markers', marker=dict(color='yellow', size=4), showlegend=False))
+            fig3d.add_trace(go.Scatter3d(x=[lo.X], y=[lo.Y], z=[lo.Z],
+                                       mode='markers', marker=dict(color='orange', size=4), showlegend=False))
+    # Start/stop
     if show_startstop and not df3.empty:
         s, e = df3.iloc[0], df3.iloc[-1]
-        fig3d.add_trace(go.Scatter3d(x=[s.X], y=[s.Y], z=[s.Z], mode='markers', marker=dict(color='green', size=6), showlegend=False))
-        fig3d.add_trace(go.Scatter3d(x=[e.X], y=[e.Y], z=[e.Z], mode='markers', marker=dict(color='red', size=6), showlegend=False))
+        fig3d.add_trace(go.Scatter3d(x=[s.X], y=[s.Y], z=[s.Z],
+                                   mode='markers', marker=dict(color='green', size=6), showlegend=False))
+        fig3d.add_trace(go.Scatter3d(x=[e.X], y=[e.Y], z=[e.Z],
+                                   mode='markers', marker=dict(color='red', size=6), showlegend=False))
 
-    # Animation control
-    if st.checkbox("Animate Slice 3D", key='anim_toggle'):
-        layers_sorted = sorted(df3['Layer'].unique())
-        frames = []
-        for l in layers_sorted:
-            dfl = df3[df3['Layer'] <= l]
-            frames.append(go.Frame(
-                data=[go.Scatter3d(x=dfl['X'], y=dfl['Y'], z=dfl['Z'], mode='lines', line=dict(color='blue', width=6), showlegend=False)],
-                name=str(l)
-            ))
-        fig_anim = go.Figure(
-            data=[go.Scatter3d(x=[df3['X'].iloc[0]], y=[df3['Y'].iloc[0]], z=[df3['Z'].iloc[0]], mode='lines', line=dict(color='blue', width=6), showlegend=False)],
-            layout=go.Layout(
-                updatemenus=[dict(type='buttons', showactive=False,
-                                  buttons=[dict(label='Play', method='animate',
-                                                args=[None, {'frame':{'duration': int(10000/len(frames))}, 'fromcurrent':True}])])]
-            ),
-            frames=frames
-        )
-        fig_anim.update_layout(scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'), template=template, height=700, margin=dict(l=0,r=0,b=0,t=0))
-        st.plotly_chart(fig_anim, use_container_width=False, width=900)
-    else:
-        fig3d.update_layout(scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'), template=template, height=700, margin=dict(l=0,r=0,b=0,t=0))
-        st.plotly_chart(fig3d, use_container_width=False, width=900)
+    fig3d.update_layout(
+        scene=dict(xaxis_title='X (mm)', yaxis_title='Y (mm)', zaxis_title='Z (mm)', aspectmode='data'),
+        template=template, height=700, margin=dict(l=0, r=0, b=0, t=0)
+    )
+    st.plotly_chart(fig3d, use_container_width=False, width=900)
 
 # XYZ Over Time
 with st.expander("📈 XYZ Axes Over Time", expanded=True):
-    mode_xyz = st.selectbox("XYZ Plot Mode:", ['Raw','Layer Average'], key='xyz_mode')
-    xyz_axes = st.multiselect("Select XYZ axes:", ['X','Y','Z'], default=['X','Y','Z'])
+    mode_xyz = st.selectbox("XYZ Plot Mode:", ['Raw','Layer Average'], key='xyz_mode2')
+    xyz_axes = st.multiselect("Select XYZ axes:", ['X','Y','Z'], default=['X','Y','Z'], key='xyz_axes')
     if xyz_axes:
         dfx = df_slice.sort_values('Time Step')
-        if mode_xyz == 'Raw':
+        if mode_xyz=='Raw':
             fig_xyz = px.line(dfx, x='Time Step', y=xyz_axes, template=template)
         else:
             avg = df_slice.groupby('Layer')[xyz_axes].mean().reset_index()
@@ -270,10 +201,10 @@ with st.expander("📈 XYZ Axes Over Time", expanded=True):
 
 # ABC Over Time
 with st.expander("📈 ABC Axes Over Time", expanded=True):
-    mode_abc = st.selectbox("ABC Plot Mode:", ['Raw','Layer Average'], key='abc_mode')
-    abc_axes = st.multiselect("Select ABC axes:", ['A','B','C'], default=['A','B','C'])
+    mode_abc = st.selectbox("ABC Plot Mode:", ['Raw','Layer Average'], key='abc_mode2')
+    abc_axes = st.multiselect("Select ABC axes:", ['A','B','C'], default=['A','B','C'], key='abc_axes')
     if abc_axes:
-        if mode_abc == 'Raw':
+        if mode_abc=='Raw':
             fig_abc = px.line(dfx, x='Time Step', y=abc_axes, template=template)
         else:
             avg = df_slice.groupby('Layer')[abc_axes].mean().reset_index()
@@ -284,4 +215,4 @@ with st.expander("📈 ABC Axes Over Time", expanded=True):
 # Data Table
 with st.expander('📄 Data Table & Export', expanded=False):
     st.dataframe(df_slice, use_container_width=True)
-    st.download_button('Download CSV', df_slice.to_csv(index=False).encode(), "motion_data.csv", "text/csv")
+    st.download_button('Download CSV', df_slice.to_csv(index=False).encode(), 'motion_data.csv', 'text/csv')
