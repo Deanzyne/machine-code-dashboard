@@ -97,6 +97,27 @@ for ax in ['X','Y','Z']:
     st.sidebar.write(f"- {ax} length: {lengths[ax]:.2f} mm")
 st.sidebar.write(f"**Volume:** {volume_m3:.6f} m³")
 
+# 3D bounding box visualizer in sidebar
+bx, by, bz = bbox['X'], bbox['Y'], bbox['Z']
+corners = [[bx[i], by[j], bz[k]] for i in range(2) for j in range(2) for k in range(2)]
+edges = [(0,1),(0,2),(0,4),(1,3),(1,5),(2,3),(2,6),(3,7),(4,5),(4,6),(5,7),(6,7)]
+fig_bb = go.Figure()
+for e in edges:
+    x0,y0,z0 = corners[e[0]]
+    x1,y1,z1 = corners[e[1]]
+    fig_bb.add_trace(go.Scatter3d(
+        x=[x0,x1], y=[y0,y1], z=[z0,z1],
+        mode='lines', line=dict(color='lightgray', width=2), showlegend=False
+    ))
+mid_x = (bx[0] + bx[1]) / 2
+fig_bb.add_trace(go.Scatter3d(x=[mid_x], y=[by[0]], z=[bz[0]], mode='text', text=[f"X: {lengths['X']:.2f} mm"], showlegend=False))
+mid_y = (by[0] + by[1]) / 2
+fig_bb.add_trace(go.Scatter3d(x=[bx[0]], y=[mid_y], z=[bz[0]], mode='text', text=[f"Y: {lengths['Y']:.2f} mm"], showlegend=False))
+mid_z = (bz[0] + bz[1]) / 2
+fig_bb.add_trace(go.Scatter3d(x=[bx[0]], y=[by[0]], z=[mid_z], mode='text', text=[f"Z: {lengths['Z']:.2f} mm"], showlegend=False))
+fig_bb.update_layout(scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode='data'), template='plotly_dark', height=200, margin=dict(l=0, r=0, b=0, t=0))
+st.sidebar.plotly_chart(fig_bb, use_container_width=True, config={"displayModeBar": False})
+
 # Helper for slider ticks
 def layer_ticks(min_l, max_l):
     return {f"{i*10}%": int(min_l + (max_l-min_l)*i/10) for i in range(11)}
