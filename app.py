@@ -60,8 +60,13 @@ elif source == "Demo: Dodecahedron":
     for v in verts:
         x, y, z = v
         lines.append(f"G1 X{x:.3f} Y{y:.3f} Z{z:.3f}")
-# Read and parse data
-lines = uploaded_file.read().decode('utf-8').splitlines()
+# Read and parse data (already populated from data source selection)
+# Remove redundant read of uploaded_file
+# 'lines' variable is pre-set above based on source
+
+# Parse toolpath lines into numeric data
+cols = ['Time Step','X','Y','Z','A','B','C','E','Layer']
+
 cols = ['Time Step','X','Y','Z','A','B','C','E','Layer']
 data = {c: [] for c in cols}
 t, layer_markers, current_layer = 0, 0, -1
